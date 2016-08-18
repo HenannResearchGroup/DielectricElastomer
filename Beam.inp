@@ -1,0 +1,311 @@
+*Heading
+2D plane-strain, bilayer beam, bending actuator
+**
+** This input file is for the simulation of a 2D plane-strain, 
+**    bilayer beam, bending actuator.  It is to be used use UEL 
+**    subroutine, uel_dielectric_2D.for.
+**
+** UNITS:  Length - meters, Time - sec, Angle - radians,
+**	   Force - Newtons, Stress - Newton/meter^2 = Pa, 
+**	   Mass - kilograms, Density - kg/meter^3, Energy - Joules
+**
+** The electrical units are chosen so that the permittivity is unity.
+**
+** To interpret the simulated electric potential in volts for a real material:
+**
+**       real potential = simulated potential/sqrt(real permittivity)
+**
+** To interpret the simulated charge in coulombs for a real material:
+** 
+**       real charge = simulated charge*sqrt(real permittivity)
+**
+** REDUCED INTEGRATION: In order to use reduced integration three 
+**     changes should be made:
+**
+**     1. The element type of the dummy mesh should be changed
+**        from CPE4 to CPE4R.
+**     2. In the Material Definition section of this input file,
+**        the '*Hourglass Stiffness' command and subsequent line
+**        should be uncommented.
+**     3. In the UEL subroutine, nInt should be set to 1.
+**
+** David L. Henann, September 2012
+**
+************************************************************************
+**			PARAMETERS
+************************************************************************
+*Parameter
+**
+** size of specimen (m)
+L0 = 20.0e-3
+t0_bot = 1.0e-3
+t0_top = 1.0e-3
+** 
+** Shear moduli
+G    = 1.0e6
+Grat = 1.0
+**
+** Bulk modulus (Pa)
+K = 1.0e9
+**
+** Gent parameter
+Imax = 7.0
+**
+** Permittivity (arbitrary units)
+permit = 1.0
+**
+** Final normalized potential
+phi_norm = 0.5
+**
+** number of elements in the x and y directions
+ex = 100
+ey_bot = 5
+ey_top = 5
+**
+** Final time (s)
+tf = 1.0
+**
+************************************************************************
+** calculations for geometry, node numbering, loads, etc., don't change
+**
+** Geometry
+t_tot = t0_bot + t0_top
+**
+** node/element numbering
+ey = ey_bot + ey_top
+nlayer = ex + 1
+**
+n1 = 1
+n2 = n1 + ex
+n3 = ey*nlayer + 1
+n4 = n3 + ex
+e1 = 1
+e2 = e1 - 1 + ex
+e3 = 1 + (ey - 1)*ex + (e1 - 1)
+e4 = e3 + ex - 1
+**
+nmid1 = ey_bot*nlayer + 1
+nmid2 = nmid1 + ex
+**
+elbot_mas1 = n1
+elbot_mas2 = n1 + 1
+elbot_mas3 = n1 + 1 + nlayer
+elbot_mas4 = n1 + nlayer
+**
+eltop_mas1 = nmid1
+eltop_mas2 = nmid1 + 1
+eltop_mas3 = nmid1 + 1 + nlayer
+eltop_mas4 = nmid1 + nlayer
+**
+e1dum = ex*ey + 1
+e2dum = e1dum - 1 + ex
+e3dum = 1 + (ey - 1)*ex + (e1dum - 1)
+e4dum = e3dum + ex - 1
+**
+etop_master = ex*ey_bot + 1
+**
+** Final potential
+phi = phi_norm*t0_top*sqrt(G/permit)
+**
+** Substrate stiffness
+Gsub = G*Grat
+**
+** Hourglass stiffness
+Ghour = 0.005*G
+**
+************************************************************************
+**			MODEL DEFINITION
+************************************************************************
+*Node
+<n1>,  0.0,  0.0
+<n2>,  <L0>,  0.0
+<n3>,  0.0,  <t_tot>
+<n4>,  <L0>, <t_tot>
+**
+** Nodes
+**
+*Nset, nset=n1
+<n1>
+*Nset, nset=n2
+<n2>
+*Nset, nset=n3
+<n3>
+*Nset, nset=n4
+<n4>
+*Nfill, nset=left
+n1, n3, <ey>, <nlayer>
+*Nfill, nset=right
+n2, n4, <ey>, <nlayer>
+*Nfill, nset=Nall
+left, right, <ex>,1
+*Nset, nset=top, gen
+<n3>, <n4>, 1
+*Nset, nset=bottom, gen
+<n1>, <n2>, 1
+*Nset, nset=midplane, gen
+<nmid1>,<nmid2>,1
+**
+** Reference nodes
+**
+*Node, nset=nref1
+999990,<L0>,0.0
+*Node, nset=nref2
+999991,<L0>,<t_tot>
+*Nset, nset=nrefs
+nref1,nref2
+*Node, nset=nRef
+999992,<L0>,<t0_bot>
+**
+** Elements
+**
+*User Element,Nodes=4,Type=U1,Iproperties=1,Properties=4,Coordinates=2,Variables=1,Unsymm
+1,2,11
+**
+*Element, type=U1
+<e1>, <elbot_mas1>,<elbot_mas2>,<elbot_mas3>,<elbot_mas4>
+*Elgen, elset=elbot
+<e1>,<ex>,1,1,<ey_bot>,<nlayer>,<ex>
+*Element, type=U1
+<etop_master>, <eltop_mas1>,<eltop_mas2>,<eltop_mas3>,<eltop_mas4>
+*Elgen, elset=eltop
+<etop_master>,<ex>,1,1,<ey_top>,<nlayer>,<ex>
+*Elset, elset=Elall
+elbot,eltop
+**
+** Make the dummy mesh, shares nodes with the real mesh,
+**  allows visualization of the results, access to 
+**  hourglass controls, and access to mechanical, 
+**  traction-type boundary conditions
+**
+*Element, type=CPE4
+<e1dum>, <elbot_mas1>,<elbot_mas2>,<elbot_mas3>,<elbot_mas4>
+*Elgen, elset=ElDummy
+<e1dum>,<ex>,1,1,<ey>,<nlayer>,<ex>
+*Elset, elset=eltopdum, gen
+<e3dum>, <e4dum>, 1
+*Elset, elset=elbotdum, gen
+<e1dum>, <e2dum>, 1
+*Elset, elset=elrightdum, gen
+<e2dum>, <e4dum>, <ex>
+*Elset, elset=elleftdum, gen
+<e1dum>, <e3dum>, <ex>
+**
+** Make a dummy element which is not connected to anything with CPE4T
+**  just so that we can have the coupled thermal-displacement
+**
+*Node
+999996,  0.0, 0.0
+999997,  .00001, 0.0
+999998,  .00001, .00001
+999999,  0.0, .00001
+*Nset, nset=tempElement
+999996,999997,999998,999999
+*Element, Type=CPE4T
+999999,999996,999997,999998,999999
+*Elset,elset=tempElement
+999999
+************************************************************************
+**			MATERIAL DEFINITION
+************************************************************************
+**
+** Material properties for the real material
+**
+*uel property,elset=eltop
+*******************************************************************
+**G	Kbulk	Imax	permit		pe
+<G>,	<K>,	<Imax>,	<permit>,	1
+**
+*******************************************************************
+*uel property,elset=elbot
+*******************************************************************
+**G	Kbulk	Imax	permit		pe
+<Gsub>,	<K>,	<Imax>,	<permit>,	1
+**
+*******************************************************************
+**
+** Dummy mesh material properties
+**
+*Solid section, elset=ElDummy, material=Material-1
+***Hourglass stiffness
+**<Ghour>
+*Solid section, elset=tempElement, material=Material-2
+**
+*Material, name=Material-1
+** The dummy mesh stiffness is very small
+*Elastic
+1.e-20
+*Density
+1.0
+**
+*Material, name=Material-2
+*Elastic
+1.e-20
+*Conductivity
+1.0
+*Density
+1.0
+*Specific heat
+1.0
+**
+************************************************************************
+**			INITIAL CONDITIONS
+************************************************************************
+*Initial conditions, type=temperature
+nall, 0.0
+tempElement, 0.0
+************************************************************************
+**			   AMPLITUDE
+************************************************************************
+*Amplitude, name=Amp-1
+0.0,0.0,<tf>,1.0
+************************************************************************
+**			   CONSTRAINTS
+************************************************************************
+*MPC
+SLIDER,right,nref1,nref2
+*Rigid body, ref node=nRef, pin nset=nrefs
+************************************************************************
+**			STEP DEFINITION
+************************************************************************
+*Step, Name=Load, nlgeom=yes, inc=50000
+*Coupled temperature-displacement, deltmx=100.0
+0.05,<tf>,1.e-8,0.05
+*controls, parameters=line search
+10,1.0,0.0001,0.25,0.10
+*controls, parameters=time incrementation
+,,,,,,,10,,,,,,
+**
+*Boundary
+left,1,1
+<nmid1>,2,2
+bottom,11,11,0.0
+midplane,11,11,0.0
+nRef,2,2
+*Boundary, amplitude=Amp-1
+top,11,11,<phi>
+*Boundary
+tempElement,encastre
+tempElement,11,11,0.0
+**
+*Output, field, time interval=0.05
+*node output, nset=nall
+u,nt,coord
+*node output, nset=nrefs
+u,nt,coord
+*node output, nset=nref
+u,nt,coord
+*Element output, elset=ElDummy
+le
+**
+*Output, history, time interval=0.05
+*node output, nset=right
+u1,u2
+*node output, nset=top
+nt11
+*node output, nset=midplane
+rfl11
+*node output, nset=nRef
+ur3,rm3
+**
+*End Step
+************************************************************************
